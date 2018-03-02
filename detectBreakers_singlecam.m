@@ -1,12 +1,29 @@
 function [data,mask] = detectBreakers_singlecam(data,ref)
 
-% Threshold images, return BW image as logical 0,1 image
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Function to threshold Thermal Infrared images and return logical mask for
+% active breaking.
+%
+% Inputs:
+% data = image array (#rows x #cols x #frames)
+% ref = region of interest (subset of data) used to compute threshold value
+%
+% Outputs:
+% data = same as input data
+% mask = logical mask of active breaking (0 = non-breaking, 1 = breaking)
+%
+% Created on 2 March 2018 by Roxanne J Carini at Applied Physics
+% Laboratory, University of Washington.
+% Contact: rjcarini@uw.edu
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-% ref is patch for creating pdf of pix int
+% Ref is patch for creating pdf of pix int
 ref = ref(:);
 
-% create pdf, diff(pdf), diff(diff(pdf))
+% Create pdf, diff(pdf), diff(diff(pdf))
 edg = min(data(:)):20:max(data(:));
 cent = (edg(1)+10):20:max(edg);
 [pdf,~] = histcounts(double(ref(:)),edg);
@@ -15,8 +32,7 @@ centd = (cent(1)+10):20:max(cent);
 ddpdf = diff(dpdf);
 centdd = (centd(1)+10):20:max(centd);
 
-% PRIMARY METHOD
-% choose minimum between two peaks of bimodal distribution
+% PRIMARY METHOD: Choose minimum between two peaks of bimodal distribution.
 [XMAX,IMAX,XMIN,IMIN] = extrema(pdf);
 IMAX(XMAX<1e-3) = [];
 XMAX(XMAX<1e-3) = [];
@@ -29,17 +45,17 @@ else
     Ibind = IMIN(IMIN>IMAX(1) & IMIN<IMAX(end));
 end
 Ib = cent(Ibind);
-% if more than one minimum between the peaks, take the first indexed (the
+% If more than one minimum between the peaks, take the first indexed (the
 % lowest minimum) as Ib
 if numel(Ib)>1
   Ib = cent(Ibind(1)); 
   Ibind = Ibind(1);
 end
 
-% SECONDARY METHOD:
-% when no bimodal distribution exists, look for point when pdf starts to
-% "flatten out" a bit, more like, where the negative slope of the pdf
-% (to the right of the peak) begins to become more shallow/ not as steep
+% SECONDARY METHOD: When no bimodal distribution exists, look for point
+% when pdf starts to "flatten out" a bit, more like, where the negative
+% slope of the pdf (to the right of the peak) begins to become more
+% shallow/ not as steep.
 if isempty(Ib)
     [~,maxnegslope] = min(dpdf);
     [~,Ibind] = find(sign(ddpdf(maxnegslope:end))==-1,1,'first');
@@ -51,8 +67,8 @@ mask = zeros(size(data));
 mask(data>=Ib) = 1;
 mask = logical(mask);
 
-% TERTIARY METHOD: when may too much of the image is
-% identified as "breaking", use secondary method 
+% TERTIARY METHOD: When may too much of the image is identified as
+% "breaking", use tertiary method.
 if (sum(mask(:))/numel(mask))>0.3
     [~,maxnegslope] = min(dpdf);
     [XMAX,IMAX,XMIN,IMIN] = extrema(dpdf(maxnegslope:end));
@@ -64,8 +80,8 @@ if (sum(mask(:))/numel(mask))>0.3
     mask = logical(mask);
 end
 
-% plot the pdf, slope of pdf, inflection of pdf')
-figure(1)
+% Plot the pdf, slope of pdf, concavity of pdf
+figure
 clf
 plot(cent,pdf,'-k','LineWidth',3)
 hold on
@@ -80,7 +96,7 @@ title('IR Pixel Intensity Distribution')
 set(gca,'FontSize',18)
 drawnow
 
-% % plot mask
+% % Plot mask
 % figure
 % for i=1:size(mask,3)
 %     clf
